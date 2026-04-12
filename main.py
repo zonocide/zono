@@ -5,12 +5,26 @@ import os
 
 app = Flask(__name__)
 
-# Get webhook URL from environment variable (much safer than hardcoding)
+# Trust the proxy (Railway uses 1 proxy layer)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+
+def get_client_ip():
+    """Get real client IP even behind Railway's proxy"""
+    # Try X-Forwarded-For first (most reliable on Railway)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        # Take the first IP in the list (leftmost = real client)
+        return forwarded.split(",")[0].strip()
+    
+    # Fallbacks
+    return request.remote_addr or request.headers.get("X-Real-IP") or "Unknown"
 
 @app.route('/')
 def log_ip():
-    ip = request.remote_addr
+    ip = get_client_ip()
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     data = {
@@ -19,16 +33,22 @@ def log_ip():
     
     if WEBHOOK_URL:
         try:
-            requests.post(WEBHOOK_URL, json=data, timeout=5)
-        except:
-            pass  # Silently fail if webhook is down or invalid
+            requests.post(WEBHOOK_URL, json=data, timeout=10)
+            print(f"✅ Webhook sent for IP: {ip}")   # This appears in Deploy Logs
+        except Exception as e:
+            print(f"❌ Webhook failed: {e}")
     else:
-        print("Warning: WEBHOOK_URL environment variable not set")
+        print("⚠️  WEBHOOK_URL environment variable is not set!")
     
-    return "test"  # You can change this to a better message if needed
+    # Better response so you know it worked
+    return f"""
+    <h2>IP Logger</h2>
+    <p>Your IP has been logged.</p>
+    <p><strong>Logged IP:</strong> {ip}</p>
+    <p>Time: {now}</p>
+    """
 
-# Only run with Flask's dev server locally
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"Starting Flask app on port {port}")
+    print(f"🚀 Starting app on port {port}")
     app.run(host="0.0.0.0", port=port)
